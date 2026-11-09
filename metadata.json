@@ -1,0 +1,6 @@
+{
+  "name": "ConnectNetwalk",
+  "description": "Enterprise-grade professional networking platform featuring AI career intelligence, interactive job portal, real-time messaging, and creator tools.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
