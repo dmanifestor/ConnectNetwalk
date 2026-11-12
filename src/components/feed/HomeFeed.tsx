@@ -11,6 +11,13 @@ import {
   ExternalLink,
   ArrowRight,
   ShieldCheck,
+  FileText,
+  Layers,
+  ChevronDown,
+  SlidersHorizontal,
+  UserCheck,
+  Flame,
+  Users,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { PostCard } from './PostCard';
@@ -26,7 +33,34 @@ export const HomeFeed: React.FC = () => {
     setIsCreatePostModalOpen,
   } = useApp();
 
+  const [feedSourceTab, setFeedSourceTab] = useState<'following' | 'trending' | 'connections'>('following');
+  const [contentFilter, setContentFilter] = useState<'all' | 'articles' | 'media'>('all');
   const [feedFilter, setFeedFilter] = useState<'all' | 'trending' | 'polls' | 'saved'>('all');
+  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+
+  // Dynamic counts for each feed source tab
+  const followingCount = posts.filter(
+    (p) => Boolean(p.isFollowingAuthor) || p.authorId === currentUser.id
+  ).length;
+
+  const trendingSourceCount = posts.filter((p) => p.likesCount >= 400).length;
+
+  const connectionsSourceCount = posts.filter(
+    (p) =>
+      Boolean(p.isConnectionAuthor) ||
+      connections.some(
+        (c) => c.status === 'connected' && (c.name === p.authorName || c.userId === p.authorId)
+      )
+  ).length;
+
+  // Dynamic counts for each content format
+  const allCount = posts.length;
+  const articlesCount = posts.filter(
+    (p) => p.postType === 'article' || (p.postType === 'text' && p.content.length > 200)
+  ).length;
+  const mediaCount = posts.filter(
+    (p) => p.postType === 'image' || Boolean(p.imageUrl) || p.postType === 'poll' || Boolean(p.poll)
+  ).length;
 
   const filteredPosts = posts.filter((post) => {
     // Search query filter
@@ -38,6 +72,32 @@ export const HomeFeed: React.FC = () => {
       if (!matchContent && !matchAuthor && !matchTags) return false;
     }
 
+    // Top Feed Source Tab filter ('following' | 'trending' | 'connections')
+    if (feedSourceTab === 'following') {
+      const isFollowing = Boolean(post.isFollowingAuthor) || post.authorId === currentUser.id;
+      if (!isFollowing) return false;
+    } else if (feedSourceTab === 'trending') {
+      const isTrending = post.likesCount >= 400;
+      if (!isTrending) return false;
+    } else if (feedSourceTab === 'connections') {
+      const isDirectConnection =
+        Boolean(post.isConnectionAuthor) ||
+        connections.some(
+          (c) => c.status === 'connected' && (c.name === post.authorName || c.userId === post.authorId)
+        );
+      if (!isDirectConnection) return false;
+    }
+
+    // Content format filter ('all' | 'articles' | 'media')
+    if (contentFilter === 'articles') {
+      const isArticle = post.postType === 'article' || (post.postType === 'text' && post.content.length > 200);
+      if (!isArticle) return false;
+    } else if (contentFilter === 'media') {
+      const isMedia = post.postType === 'image' || Boolean(post.imageUrl) || post.postType === 'poll' || Boolean(post.poll);
+      if (!isMedia) return false;
+    }
+
+    // Secondary feed sub-filter
     if (feedFilter === 'trending') return post.likesCount > 400;
     if (feedFilter === 'polls') return Boolean(post.poll);
     if (feedFilter === 'saved') return Boolean(post.userSaved);
@@ -153,6 +213,92 @@ export const HomeFeed: React.FC = () => {
         {/* Middle Column: Post Creator & Stream (lg:col-span-6) */}
         <main className="lg:col-span-6 space-y-4">
           
+          {/* Feed Source Tabbed Navigation: Following | Trending | Connections */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-1.5 shadow-xs">
+            <div className="grid grid-cols-3 gap-1.5">
+              <button
+                type="button"
+                onClick={() => setFeedSourceTab('following')}
+                className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all relative ${
+                  feedSourceTab === 'following'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <UserCheck className="w-4 h-4 shrink-0" />
+                <span>Following</span>
+                <span
+                  className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full font-bold ${
+                    feedSourceTab === 'following'
+                      ? 'bg-blue-700 text-white'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  {followingCount}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFeedSourceTab('trending')}
+                className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all relative ${
+                  feedSourceTab === 'trending'
+                    ? 'bg-gradient-to-r from-amber-600 to-rose-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Flame className="w-4 h-4 shrink-0" />
+                <span>Trending</span>
+                <span
+                  className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full font-bold ${
+                    feedSourceTab === 'trending'
+                      ? 'bg-rose-700 text-white'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  {trendingSourceCount}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFeedSourceTab('connections')}
+                className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all relative ${
+                  feedSourceTab === 'connections'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Users className="w-4 h-4 shrink-0" />
+                <span>Connections</span>
+                <span
+                  className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full font-bold ${
+                    feedSourceTab === 'connections'
+                      ? 'bg-emerald-700 text-white'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  {connectionsSourceCount}
+                </span>
+              </button>
+            </div>
+
+            {/* Informational Sub-Bar */}
+            <div className="flex items-center justify-between px-2 pt-2 pb-0.5 text-[11px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800/80 mt-1.5">
+              <span className="flex items-center gap-1.5">
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  feedSourceTab === 'following' ? 'bg-blue-500' : feedSourceTab === 'trending' ? 'bg-amber-500' : 'bg-emerald-500'
+                } animate-pulse`} />
+                {feedSourceTab === 'following' && 'Showing posts from engineering leaders & creators you follow'}
+                {feedSourceTab === 'trending' && 'Showing viral engineering discussions with 400+ likes'}
+                {feedSourceTab === 'connections' && 'Exclusively showing posts from your 1st-degree connections'}
+              </span>
+              <span className="text-[10px] font-mono tabular-nums text-slate-400">
+                {filteredPosts.length} posts
+              </span>
+            </div>
+          </div>
+
           {/* Quick Post Creator Trigger Card */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
             <div className="flex items-center gap-3">
@@ -195,48 +341,238 @@ export const HomeFeed: React.FC = () => {
             </div>
           </div>
 
-          {/* Feed Filter Segmented Controls */}
-          <div className="flex items-center gap-1 p-1 bg-slate-100/80 dark:bg-slate-800/80 rounded-xl text-xs overflow-x-auto">
-            <button
-              onClick={() => setFeedFilter('all')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap shrink-0 ${
-                feedFilter === 'all'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-              }`}
-            >
-              All Discussions
-            </button>
-            <button
-              onClick={() => setFeedFilter('trending')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap shrink-0 ${
-                feedFilter === 'trending'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-              }`}
-            >
-              Trending (400+ Likes)
-            </button>
-            <button
-              onClick={() => setFeedFilter('polls')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap shrink-0 ${
-                feedFilter === 'polls'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-              }`}
-            >
-              Industry Polls
-            </button>
-            <button
-              onClick={() => setFeedFilter('saved')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap shrink-0 ${
-                feedFilter === 'saved'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-              }`}
-            >
-              Saved Posts
-            </button>
+          {/* Content Navigation Filter Component (Tabs + Dropdown) */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-2 sm:p-2.5 shadow-xs space-y-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              {/* Tab Filter Component: All Posts, Articles, Media */}
+              <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl text-xs font-semibold overflow-x-auto max-w-full">
+                <button
+                  type="button"
+                  onClick={() => setContentFilter('all')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all whitespace-nowrap shrink-0 ${
+                    contentFilter === 'all'
+                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>All Posts</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    contentFilter === 'all'
+                      ? 'bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400'
+                      : 'bg-slate-200/70 dark:bg-slate-700/70 text-slate-500'
+                  }`}>
+                    {allCount}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setContentFilter('articles')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all whitespace-nowrap shrink-0 ${
+                    contentFilter === 'articles'
+                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Articles</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    contentFilter === 'articles'
+                      ? 'bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400'
+                      : 'bg-slate-200/70 dark:bg-slate-700/70 text-slate-500'
+                  }`}>
+                    {articlesCount}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setContentFilter('media')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all whitespace-nowrap shrink-0 ${
+                    contentFilter === 'media'
+                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  <span>Media</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    contentFilter === 'media'
+                      ? 'bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400'
+                      : 'bg-slate-200/70 dark:bg-slate-700/70 text-slate-500'
+                  }`}>
+                    {mediaCount}
+                  </span>
+                </button>
+              </div>
+
+              {/* Dropdown Filter Component */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 transition-colors shadow-2xs"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
+                  <span>
+                    {feedFilter === 'all'
+                      ? 'All Feed'
+                      : feedFilter === 'trending'
+                      ? 'Trending'
+                      : feedFilter === 'polls'
+                      ? 'Polls'
+                      : 'Saved'}
+                  </span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isFilterDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isFilterDropdownOpen && (
+                  <div className="absolute right-0 mt-1.5 w-48 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl py-1.5 z-30 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Content View
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setContentFilter('all');
+                        setIsFilterDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between ${
+                        contentFilter === 'all' ? 'text-blue-600 dark:text-blue-400 font-bold bg-blue-50/50 dark:bg-blue-950/30' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <Layers className="w-3.5 h-3.5" />
+                        All Posts
+                      </span>
+                      <span className="font-mono text-[10px] text-slate-400">{allCount}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setContentFilter('articles');
+                        setIsFilterDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between ${
+                        contentFilter === 'articles' ? 'text-blue-600 dark:text-blue-400 font-bold bg-blue-50/50 dark:bg-blue-950/30' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <FileText className="w-3.5 h-3.5" />
+                        Articles
+                      </span>
+                      <span className="font-mono text-[10px] text-slate-400">{articlesCount}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setContentFilter('media');
+                        setIsFilterDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between ${
+                        contentFilter === 'media' ? 'text-blue-600 dark:text-blue-400 font-bold bg-blue-50/50 dark:bg-blue-950/30' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <ImageIcon className="w-3.5 h-3.5" />
+                        Media
+                      </span>
+                      <span className="font-mono text-[10px] text-slate-400">{mediaCount}</span>
+                    </button>
+
+                    <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+                    <div className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Feed Category
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFeedFilter('all');
+                        setIsFilterDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-xs ${
+                        feedFilter === 'all' ? 'text-blue-600 dark:text-blue-400 font-bold bg-blue-50/50 dark:bg-blue-950/30' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      All Discussions
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFeedFilter('trending');
+                        setIsFilterDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-xs ${
+                        feedFilter === 'trending' ? 'text-blue-600 dark:text-blue-400 font-bold bg-blue-50/50 dark:bg-blue-950/30' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      Trending (400+ Likes)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFeedFilter('polls');
+                        setIsFilterDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-xs ${
+                        feedFilter === 'polls' ? 'text-blue-600 dark:text-blue-400 font-bold bg-blue-50/50 dark:bg-blue-950/30' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      Industry Polls
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFeedFilter('saved');
+                        setIsFilterDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-xs ${
+                        feedFilter === 'saved' ? 'text-blue-600 dark:text-blue-400 font-bold bg-blue-50/50 dark:bg-blue-950/30' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      Saved Bookmarks
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Quick status indicator if sub-filter or active search is applied */}
+            {(feedFilter !== 'all' || contentFilter !== 'all' || searchQuery.trim()) && (
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800/80">
+                <span>Filtering by:</span>
+                <span className="font-semibold text-blue-600 dark:text-blue-400 capitalize">
+                  {contentFilter === 'all' ? 'All Posts' : contentFilter}
+                </span>
+                {feedFilter !== 'all' && (
+                  <>
+                    <span>·</span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-300 capitalize">
+                      {feedFilter}
+                    </span>
+                  </>
+                )}
+                {searchQuery.trim() && (
+                  <>
+                    <span>·</span>
+                    <span className="italic truncate max-w-[150px]">
+                      "{searchQuery}"
+                    </span>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setContentFilter('all');
+                    setFeedFilter('all');
+                  }}
+                  className="ml-auto text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                >
+                  Reset filters
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Posts Feed Stream */}

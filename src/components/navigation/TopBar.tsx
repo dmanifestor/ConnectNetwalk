@@ -328,24 +328,6 @@ export const TopBar: React.FC = () => {
 
         </div>
       </div>
-
-      {/* Mobile Nav Drawer Row */}
-      <div className="md:hidden flex items-center justify-around border-t border-slate-100 dark:border-slate-800/80 px-2 py-1.5 overflow-x-auto bg-slate-50/50 dark:bg-slate-900/50">
-        {navItems.map((item) => (
-          <button
-            key={item.tab}
-            onClick={() => setActiveTab(item.tab)}
-            className={`p-2 rounded-lg text-xs flex flex-col items-center gap-1 ${
-              activeTab === item.tab
-                ? 'text-blue-600 dark:text-blue-400 font-semibold'
-                : 'text-slate-500'
-            }`}
-          >
-            {item.icon}
-            <span className="text-[10px]">{item.label}</span>
-          </button>
-        ))}
-      </div>
     </header>
   );
 };

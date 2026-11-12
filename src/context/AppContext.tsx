@@ -57,8 +57,11 @@ interface AppContextType {
   flagPost: (postId: string) => void;
   removePost: (postId: string) => void;
   jobs: Job[];
+  savedJobIds: string[];
+  toggleSaveJob: (jobId: string) => void;
   applyToJob: (jobId: string) => void;
   createJob: (jobData: Omit<Job, 'id' | 'postedAt' | 'applicantsCount' | 'hasApplied'>) => void;
+  isOnline: boolean;
   companies: Company[];
   toggleFollowCompany: (companyId: string) => void;
   selectedCompanyId: string | null;
@@ -71,6 +74,7 @@ interface AppContextType {
   activeConversationId: string;
   setActiveConversationId: (id: string) => void;
   sendMessage: (convId: string, text: string, isAi?: boolean) => void;
+  toggleConversationReadReceipts: (convId: string, enabled?: boolean) => Promise<void>;
   notifications: NotificationItem[];
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
@@ -144,6 +148,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
   const [isCreatePostModalOpen, setIsCreatePostModalOpen] = useState(false);
+
+  const [isOnline, setIsOnline] = useState<boolean>(() => {
+    return typeof navigator !== 'undefined' ? navigator.onLine : true;
+  });
+
+  const [savedJobIds, setSavedJobIds] = useState<string[]>(() => {
+    const saved = localStorage.getItem(`${STORAGE_KEY}_saved_jobs`);
+    return saved ? JSON.parse(saved) : ['job_1', 'job_3'];
+  });
+
+  // Network connectivity listener
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      addToast('Connection restored. You are back online.', 'success');
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      addToast('Network connection lost. Operating in offline mode.', 'info');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(`${STORAGE_KEY}_saved_jobs`, JSON.stringify(savedJobIds));
+  }, [savedJobIds]);
 
   // Sync dark class on document element
   useEffect(() => {
@@ -359,6 +396,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast('New open position published to the talent portal!', 'success');
   };
 
+  const toggleSaveJob = (jobId: string) => {
+    setSavedJobIds((prev) => {
+      const isSaved = prev.includes(jobId);
+      if (isSaved) {
+        addToast('Job removed from saved bookmarks', 'info');
+        return prev.filter((id) => id !== jobId);
+      } else {
+        addToast('Job saved to your bookmarks!', 'success');
+        return [...prev, jobId];
+      }
+    });
+  };
+
   const toggleFollowCompany = (companyId: string) => {
     setCompanies((prev) =>
       prev.map((c) => {
@@ -403,12 +453,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const sendMessage = (convId: string, text: string, isAi = false) => {
     if (!text.trim()) return;
-    const newMsg = {
+    const targetConv = conversations.find((c) => c.id === convId);
+    const readReceiptsActive = targetConv?.readReceiptsEnabled ?? true;
+
+    const newMsg: ChatMessage = {
       id: `m_${Date.now()}`,
       senderId: currentUser.id,
       text: text.trim(),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       isRead: false,
+      metadata: {
+        readReceiptsEnabled: readReceiptsActive,
+        deliveredAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        syncStatus: 'synced_to_database',
+      },
     };
 
     setConversations((prev) =>
@@ -440,6 +498,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               'Sounds fantastic! Excited to collaborate.',
             ];
             const replyText = replies[Math.floor(Math.random() * replies.length)];
+            const convReceipts = c.readReceiptsEnabled ?? true;
             return {
               ...c,
               lastMessage: replyText,
@@ -451,7 +510,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   senderId: c.participantId,
                   text: replyText,
                   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                  isRead: true,
+                  isRead: convReceipts,
+                  metadata: {
+                    readReceiptsEnabled: convReceipts,
+                    deliveredAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    readAt: convReceipts ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
+                    syncStatus: 'synced_to_database',
+                  },
                 },
               ],
             };
@@ -460,6 +525,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         })
       );
     }, 2400);
+  };
+
+  const toggleConversationReadReceipts = async (convId: string, enabled?: boolean) => {
+    let nextState = false;
+    let participantName = '';
+
+    setConversations((prev) =>
+      prev.map((c) => {
+        if (c.id === convId) {
+          participantName = c.participantName;
+          nextState = enabled !== undefined ? enabled : !(c.readReceiptsEnabled ?? true);
+          const updatedMessages = c.messages.map((m) => ({
+            ...m,
+            metadata: {
+              ...m.metadata,
+              readReceiptsEnabled: nextState,
+              updatedAt: new Date().toISOString(),
+              syncStatus: 'synced_to_database',
+            },
+          }));
+          return {
+            ...c,
+            readReceiptsEnabled: nextState,
+            messages: updatedMessages,
+          };
+        }
+        return c;
+      })
+    );
+
+    // Persist to backend database endpoint
+    try {
+      await fetch(`/api/conversations/${convId}/read-receipts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: nextState }),
+      });
+    } catch (err) {
+      console.warn('Backend DB sync deferred:', err);
+    }
+
+    addToast(
+      nextState
+        ? `Read receipts ON for ${participantName || 'conversation'}: seen timestamps will be shared.`
+        : `Read receipts OFF for ${participantName || 'conversation'}: your read status is now private.`,
+      'info'
+    );
   };
 
   const markNotificationRead = (id: string) => {
@@ -508,8 +620,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         flagPost,
         removePost,
         jobs,
+        savedJobIds,
+        toggleSaveJob,
         applyToJob,
         createJob,
+        isOnline,
         companies,
         toggleFollowCompany,
         selectedCompanyId,
@@ -522,6 +637,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activeConversationId,
         setActiveConversationId,
         sendMessage,
+        toggleConversationReadReceipts,
         notifications,
         markNotificationRead,
         markAllNotificationsRead,

@@ -9,9 +9,15 @@ import {
   Mic,
   MoreVertical,
   CheckCheck,
+  Check,
   Search,
   Loader2,
   X,
+  Settings,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  Info,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -22,6 +28,7 @@ export const MessagingCenter: React.FC = () => {
     activeConversationId,
     setActiveConversationId,
     sendMessage,
+    toggleConversationReadReceipts,
     addToast,
   } = useApp();
 
@@ -29,6 +36,8 @@ export const MessagingCenter: React.FC = () => {
   const [smartReplies, setSmartReplies] = useState<{ type: string; text: string }[]>([]);
   const [isLoadingSmartReplies, setIsLoadingSmartReplies] = useState(false);
   const [isVideoCallActive, setIsVideoCallActive] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [inspectingMessageId, setInspectingMessageId] = useState<string | null>(null);
 
   const activeConv =
     conversations.find((c) => c.id === activeConversationId) || conversations[0];
@@ -170,7 +179,30 @@ export const MessagingCenter: React.FC = () => {
               </div>
 
               {/* Action buttons */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 relative">
+                {/* Read Receipts Settings Toggle Dropdown Trigger */}
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                    activeConv.readReceiptsEnabled !== false
+                      ? 'border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 shadow-2xs'
+                      : 'border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                  }`}
+                  title="Configure chat privacy and read receipts"
+                >
+                  {activeConv.readReceiptsEnabled !== false ? (
+                    <Eye className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <EyeOff className="w-3.5 h-3.5 text-slate-400" />
+                  )}
+                  <span className="hidden sm:inline">
+                    {activeConv.readReceiptsEnabled !== false ? 'Receipts: ON' : 'Receipts: OFF'}
+                  </span>
+                  <Settings className="w-3.5 h-3.5 text-slate-400 ml-0.5" />
+                </button>
+
+                {/* Call Buttons */}
                 <button
                   onClick={() => setIsVideoCallActive(true)}
                   className="p-2 rounded-lg text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -185,13 +217,133 @@ export const MessagingCenter: React.FC = () => {
                 >
                   <Phone className="w-4 h-4" />
                 </button>
+
+                {/* Conversation Settings Popover */}
+                {isSettingsOpen && (
+                  <div className="absolute right-0 top-11 w-84 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-4 z-40 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+                          Chat Settings & Privacy
+                        </h4>
+                        <p className="text-[10px] text-slate-400">
+                          Channel: {activeConv.participantName}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setIsSettingsOpen(false)}
+                        className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="py-3 space-y-3.5">
+                      {/* Read Receipts Setting Switch */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-0.5">
+                          <label
+                            htmlFor="read-receipts-toggle"
+                            className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5 text-blue-500" />
+                            <span>Read Receipts</span>
+                          </label>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-normal">
+                            Allow {activeConv.participantName} to see when you have read incoming messages. When disabled, your status remains "Sent" without read timestamps.
+                          </p>
+                        </div>
+
+                        {/* Interactive toggle switch */}
+                        <button
+                          id="read-receipts-toggle"
+                          type="button"
+                          role="switch"
+                          aria-checked={activeConv.readReceiptsEnabled !== false}
+                          onClick={() => {
+                            toggleConversationReadReceipts(
+                              activeConv.id,
+                              !(activeConv.readReceiptsEnabled !== false)
+                            );
+                          }}
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            activeConv.readReceiptsEnabled !== false
+                              ? 'bg-blue-600'
+                              : 'bg-slate-300 dark:bg-slate-700'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                              activeConv.readReceiptsEnabled !== false
+                                ? 'translate-x-5'
+                                : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Database Message Metadata Box */}
+                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 text-[11px] space-y-1.5 font-sans">
+                        <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
+                          <span>Database Store:</span>
+                          <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                            Synced to Database
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
+                          <span>Metadata Policy:</span>
+                          <span className="font-mono text-slate-700 dark:text-slate-300 font-medium">
+                            {activeConv.readReceiptsEnabled !== false
+                              ? 'broadcast_seen_event'
+                              : 'suppressed_private'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-[10px]">
+                          <span>Active Channel ID:</span>
+                          <span className="font-mono text-slate-400">{activeConv.id}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                      <span className="text-[10px] text-slate-400">Updates sync immediately</span>
+                      <button
+                        onClick={() => setIsSettingsOpen(false)}
+                        className="px-3 py-1 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+
+            {/* Read Receipts Disabled Advisory Banner */}
+            {activeConv.readReceiptsEnabled === false && (
+              <div className="px-6 py-2 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200/80 dark:border-amber-900/60 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <EyeOff className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>
+                    Read receipts are disabled for this chat. Your read timestamps and seen status are hidden.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleConversationReadReceipts(activeConv.id, true)}
+                  className="font-semibold underline text-[11px] hover:text-amber-950 dark:hover:text-amber-100"
+                >
+                  Turn On
+                </button>
+              </div>
+            )}
 
             {/* Messages Scroll Area */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               {activeConv.messages.map((msg) => {
                 const isMe = msg.senderId === currentUser.id;
+                const isReceiptsActive = activeConv.readReceiptsEnabled !== false;
+
                 return (
                   <div
                     key={msg.id}
@@ -206,10 +358,69 @@ export const MessagingCenter: React.FC = () => {
                     >
                       {msg.text}
                     </div>
-                    <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-1 tabular-nums">
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-1 tabular-nums">
                       <span>{msg.timestamp}</span>
-                      {isMe && <CheckCheck className="w-3 h-3 text-blue-500" />}
+                      {isMe && (
+                        isReceiptsActive ? (
+                          <span
+                            className="flex items-center gap-0.5 text-blue-500 font-medium"
+                            title="Read receipt active: Message seen by participant"
+                          >
+                            <CheckCheck className="w-3.5 h-3.5" />
+                            <span className="text-[9px] font-mono">Read</span>
+                          </span>
+                        ) : (
+                          <span
+                            className="flex items-center gap-0.5 text-slate-400 font-medium"
+                            title="Read receipts disabled for this conversation"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span className="text-[9px] font-mono">Sent</span>
+                          </span>
+                        )
+                      )}
+                      {msg.metadata && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setInspectingMessageId(
+                              inspectingMessageId === msg.id ? null : msg.id
+                            )
+                          }
+                          className="hover:text-blue-500 dark:hover:text-blue-400 transition-colors ml-0.5 p-0.5 rounded"
+                          title="Inspect message metadata record"
+                        >
+                          <Info className="w-3 h-3" />
+                        </button>
+                      )}
                     </div>
+
+                    {/* Metadata Card Drawer */}
+                    {inspectingMessageId === msg.id && msg.metadata && (
+                      <div className="mt-1 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-[10px] font-mono text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-xs max-w-xs space-y-0.5">
+                        <div className="font-bold text-slate-800 dark:text-slate-100 pb-0.5 border-b border-slate-200 dark:border-slate-700">
+                          Database Message Metadata
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Receipts Policy:</span>
+                          <span className="font-semibold">{msg.metadata.readReceiptsEnabled ? 'enabled' : 'disabled'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Delivered At:</span>
+                          <span>{msg.metadata.deliveredAt || msg.timestamp}</span>
+                        </div>
+                        {msg.metadata.readAt && (
+                          <div className="flex justify-between">
+                            <span>Read At:</span>
+                            <span>{msg.metadata.readAt}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                          <span>Database Store:</span>
+                          <span>synced_to_database</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}

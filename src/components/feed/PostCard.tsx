@@ -9,6 +9,7 @@ import {
   Flag,
   CheckCircle2,
   Sparkles,
+  FileText,
 } from 'lucide-react';
 import { Post } from '../../types';
 import { useApp } from '../../context/AppContext';
@@ -111,6 +112,12 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
 
       {/* Post Text Body */}
       <div className="px-4 sm:px-5 pb-3">
+        {post.postType === 'article' && (
+          <div className="mb-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60 text-xs font-semibold">
+            <FileText className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+            <span>Technical Article / Whitepaper</span>
+          </div>
+        )}
         <p className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-line">
           {post.content}
         </p>

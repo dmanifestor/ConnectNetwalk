@@ -14,7 +14,9 @@ import {
   Check,
   Send,
   Loader2,
+  Bookmark,
 } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useApp } from '../../context/AppContext';
 import { Job } from '../../types';
 import { LOGO_AURORA } from '../../data/mockData';
@@ -22,6 +24,8 @@ import { LOGO_AURORA } from '../../data/mockData';
 export const JobsPortal: React.FC = () => {
   const {
     jobs,
+    savedJobIds,
+    toggleSaveJob,
     currentUser,
     activeRole,
     applyToJob,
@@ -57,7 +61,9 @@ export const JobsPortal: React.FC = () => {
   const [newRequirements, setNewRequirements] = useState('5+ years distributed systems, Go/Rust, Cloud infrastructure');
 
   const filteredJobs = jobs.filter((job) => {
-    if (filterType !== 'all' && job.workplaceType.toLowerCase() !== filterType.toLowerCase()) {
+    if (filterType === 'saved') {
+      if (!savedJobIds.includes(job.id)) return false;
+    } else if (filterType !== 'all' && job.workplaceType.toLowerCase() !== filterType.toLowerCase()) {
       return false;
     }
     if (keyword.trim()) {
@@ -182,17 +188,47 @@ export const JobsPortal: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto">
-            {['all', 'Remote', 'Hybrid', 'On-Site'].map((type) => (
+            <button
+              onClick={() => setFilterType('all')}
+              className={`px-3 py-2 rounded-xl text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+                filterType === 'all'
+                  ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              All Positions
+            </button>
+
+            <button
+              onClick={() => setFilterType('saved')}
+              className={`px-3 py-2 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                filterType === 'saved'
+                  ? 'bg-amber-600 text-white shadow-xs font-semibold'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              <Bookmark className={`w-3.5 h-3.5 ${filterType === 'saved' ? 'fill-current' : ''}`} />
+              <span>Saved Jobs</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+                filterType === 'saved'
+                  ? 'bg-amber-700 text-white'
+                  : 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300'
+              }`}>
+                {savedJobIds.length}
+              </span>
+            </button>
+
+            {['Remote', 'Hybrid', 'On-Site'].map((type) => (
               <button
                 key={type}
-                onClick={() => setFilterType(type)}
+                onClick={() => setFilterType(type.toLowerCase())}
                 className={`px-3 py-2 rounded-xl text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
                   filterType.toLowerCase() === type.toLowerCase()
-                    ? 'bg-blue-600 text-white shadow-xs'
+                    ? 'bg-blue-600 text-white shadow-xs font-semibold'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
-                {type === 'all' ? 'All Workplace Types' : type}
+                {type}
               </button>
             ))}
           </div>
@@ -204,49 +240,94 @@ export const JobsPortal: React.FC = () => {
         
         {/* Left: Job Card List (lg:col-span-5) */}
         <div className="lg:col-span-5 space-y-3">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block px-1">
-            {filteredJobs.length} Positions Available
-          </span>
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+              {filteredJobs.length} {filterType === 'saved' ? 'Saved' : ''} Positions Available
+            </span>
+            {filterType === 'saved' && (
+              <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                <Bookmark className="w-3 h-3 fill-current" /> Saved View
+              </span>
+            )}
+          </div>
 
           <div className="space-y-3 max-h-[800px] overflow-y-auto pr-1">
-            {filteredJobs.map((job) => {
-              const isSelected = selectedJob?.id === job.id;
-              return (
-                <div
-                  key={job.id}
-                  onClick={() => {
-                    setSelectedJobId(job.id);
-                    setFitAnalysisResult(null);
-                  }}
-                  className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-blue-50/40 dark:bg-blue-950/20 border-blue-500 shadow-xs'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <img
-                        src={job.companyLogo}
-                        alt={job.company}
-                        referrerPolicy="no-referrer"
-                        className="w-10 h-10 rounded-xl object-contain bg-slate-900/5 dark:bg-slate-800 p-1 shrink-0 border border-slate-200/60 dark:border-slate-700/60"
-                      />
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white line-clamp-1">
-                          {job.title}
-                        </h3>
-                        <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 block mt-0.5">
-                          {job.company}
-                        </span>
+            {filteredJobs.length === 0 ? (
+              <div className="text-center py-12 px-4 rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900">
+                <Bookmark className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  {filterType === 'saved' ? 'No saved jobs yet' : 'No matching positions found'}
+                </h4>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  {filterType === 'saved'
+                    ? 'Bookmark jobs to quickly review and apply later.'
+                    : 'Try clearing your search keyword or workplace filter.'}
+                </p>
+              </div>
+            ) : (
+              filteredJobs.map((job) => {
+                const isSelected = selectedJob?.id === job.id;
+                const isSaved = savedJobIds.includes(job.id);
+                return (
+                  <div
+                    key={job.id}
+                    onClick={() => {
+                      setSelectedJobId(job.id);
+                      setFitAnalysisResult(null);
+                    }}
+                    className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-blue-50/40 dark:bg-blue-950/20 border-blue-500 shadow-xs'
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <img
+                          src={job.companyLogo}
+                          alt={job.company}
+                          referrerPolicy="no-referrer"
+                          className="w-10 h-10 rounded-xl object-contain bg-slate-900/5 dark:bg-slate-800 p-1 shrink-0 border border-slate-200/60 dark:border-slate-700/60"
+                        />
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900 dark:text-white line-clamp-1">
+                            {job.title}
+                          </h3>
+                          <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 block mt-0.5">
+                            {job.company}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {job.matchScore && (
+                          <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-900/60 tabular-nums">
+                            {job.matchScore}% FIT
+                          </span>
+                        )}
+                        <motion.button
+                          whileHover={{ scale: 1.15 }}
+                          whileTap={{ scale: 0.8 }}
+                          animate={{
+                            scale: isSaved ? [1, 1.35, 1] : 1,
+                            rotate: isSaved ? [0, -12, 12, 0] : 0,
+                          }}
+                          transition={{ duration: 0.35, ease: 'easeOut' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleSaveJob(job.id);
+                          }}
+                          className={`p-1.5 rounded-xl transition-all ${
+                            isSaved
+                              ? 'text-amber-500 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-900/60 shadow-xs'
+                              : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                          title={isSaved ? 'Remove from Saved Jobs' : 'Save Job Bookmark'}
+                        >
+                          <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
+                        </motion.button>
                       </div>
                     </div>
-                    {job.matchScore && (
-                      <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-900/60 tabular-nums">
-                        {job.matchScore}% FIT
-                      </span>
-                    )}
-                  </div>
 
                   <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mt-2 flex-wrap tabular-nums">
                     <span className="flex items-center gap-1">
@@ -267,7 +348,7 @@ export const JobsPortal: React.FC = () => {
                   </div>
                 </div>
               );
-            })}
+            }))}
           </div>
         </div>
 
@@ -338,6 +419,25 @@ export const JobsPortal: React.FC = () => {
                     <span>1-Click Easy Apply</span>
                   </button>
                 )}
+
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.94 }}
+                  animate={{
+                    scale: savedJobIds.includes(selectedJob.id) ? [1, 1.18, 1] : 1,
+                  }}
+                  transition={{ duration: 0.3 }}
+                  onClick={() => toggleSaveJob(selectedJob.id)}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all border ${
+                    savedJobIds.includes(selectedJob.id)
+                      ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800 shadow-xs'
+                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
+                  }`}
+                  title={savedJobIds.includes(selectedJob.id) ? 'Remove from Saved' : 'Save this job bookmark'}
+                >
+                  <Bookmark className={`w-3.5 h-3.5 ${savedJobIds.includes(selectedJob.id) ? 'fill-current text-amber-500' : ''}`} />
+                  <span>{savedJobIds.includes(selectedJob.id) ? 'Saved' : 'Save Job'}</span>
+                </motion.button>
 
                 <button
                   onClick={handleRunAiMatch}

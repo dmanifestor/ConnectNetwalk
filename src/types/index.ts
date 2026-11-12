@@ -82,6 +82,8 @@ export interface Post {
   sharesCount: number;
   userLiked?: boolean;
   userSaved?: boolean;
+  isFollowingAuthor?: boolean;
+  isConnectionAuthor?: boolean;
   comments: PostComment[];
   isFlagged?: boolean;
 }
@@ -104,6 +106,7 @@ export interface Job {
   preferredSkills: string[];
   easyApply: boolean;
   hasApplied?: boolean;
+  isSaved?: boolean;
   matchScore?: number;
 }
 
@@ -142,6 +145,14 @@ export interface ChatMessage {
   text: string;
   timestamp: string;
   isRead: boolean;
+  readAt?: string;
+  metadata?: {
+    readReceiptsEnabled?: boolean;
+    deliveredAt?: string;
+    readAt?: string;
+    clientPlatform?: string;
+    [key: string]: any;
+  };
   voiceDuration?: string;
   reactions?: string[];
   attachmentName?: string;
@@ -157,6 +168,7 @@ export interface Conversation {
   lastMessage: string;
   lastMessageTime: string;
   unreadCount: number;
+  readReceiptsEnabled?: boolean;
   messages: ChatMessage[];
 }
 
